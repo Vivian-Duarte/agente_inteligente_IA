@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Agente - Inteligência Artificial</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #181825; color: #cdd6f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .dashboard { background-color: #313244; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 800px; }
+        h2 { margin-top: 0; color: #89b4fa; text-align: center; border-bottom: 1px solid #45475a; padding-bottom: 15px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .panel { background-color: #1e1e2e; padding: 15px; border-radius: 10px; border: 1px solid #45475a; }
+        .panel h3 { margin: 0 0 10px 0; font-size: 14px; color: #a6adc8; text-transform: uppercase; border-bottom: 1px dashed #45475a; padding-bottom: 5px; }
+        .display-temp { font-size: 36px; font-weight: bold; color: #f9e2af; text-align: center; margin: 10px 0; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .info-value { font-weight: bold; color: #89dceb; text-align: right; }
+        input[type="text"] { width: 50px; padding: 5px; border-radius: 4px; border: 1px solid #89b4fa; background-color: #181825; color: white; text-align: center; font-weight: bold; }
+        
+        /* Nova Caixa de Status Baseada na sua Imagem */
+        .status-box { background-color: #45475a; border-radius: 10px; padding: 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+        .status-left { flex: 1; border-right: 1px solid #585b70; padding-right: 20px; text-align: left; font-size: 14px; }
+        .status-right { flex: 2; text-align: center; padding-left: 20px; }
+        
+        button { background-color: #89b4fa; color: #1e1e2e; border: none; padding: 10px 15px; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        button:hover { filter: brightness(1.1); }
+        .btn-green { background-color: #a6e3a1; font-size: 14px; padding: 15px; }
+        .btn-purple { background-color: #f5a9b8; font-size: 14px; padding: 15px; } /* Cor do botão de pausa igual ao seu print */
+        .controls-row { display: flex; gap: 10px; margin-top: 10px; }
+        .action-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .history-container { margin-top: 20px; max-height: 150px; overflow-y: auto; border: 1px solid #45475a; border-radius: 8px; background-color: #1e1e2e; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #313244; }
+        th { background-color: #45475a; position: sticky; top: 0; }
+        
+        .txt-red { color: #f38ba8; }
+        .txt-blue { color: #89b4fa; }
+        .txt-green { color: #a6e3a1; }
+        .txt-on { color: #a6e3a1; font-weight: bold; }
+        .txt-off { color: #f38ba8; font-weight: normal; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <h2>Sistema Inteligente de Climatização</h2>
+    
+    <div class="grid-container">
+        <div class="panel">
+            <h3>Sensores</h3>
+            <div class="display-temp" id="ui-temp-atual">35.0 °C</div>
+            <div class="info-row"><span>Umidade:</span> <span class="info-value">50%</span></div>
+            <div class="info-row" style="align-items: center;">
+                <span>Sala em Uso (Presença):</span> 
+                <input type="checkbox" id="ui-sala-uso" checked onchange="atualizarInterface()">
+            </div>
+            <div class="controls-row">
+                <button style="background-color: #f5a9b8;" onclick="alterarClima(0.5)">+ Calor</button>
+                <button style="background-color: #89dceb;" onclick="alterarClima(-0.5)">+ Frio</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Variáveis de Controle</h3>
+            <div class="info-row" style="align-items: center;">
+                <span>Temp. Desejada:</span> 
+                <input type="text" id="ui-temp-alvo" value="35.0" oninput="atualizarInterface()">
+            </div>
+            <div class="info-row"><span>Margem (Δ):</span> <span class="info-value" id="ui-delta">0.5 °C</span></div>
+            <div class="info-row"><span>Limite Superior:</span> <span class="info-value" id="ui-limite-sup">35.5 °C</span></div>
+            <div class="info-row"><span>Limite Inferior:</span> <span class="info-value" id="ui-limite-inf">34.5 °C</span></div>
+            <div class="info-row"><span>Fallback (k):</span> <span class="info-value">1.0</span></div>
+        </div>
+
+        <div class="panel">
+            <h3>Aprendizado (Testes Dinâmicos)</h3>
+            <div class="info-row"><span>Taxa Resfria.:</span> <span class="info-value txt-blue" id="ui-taxa-resf">Aguardando</span></div>
+            <div class="info-row"><span>Taxa Aquec.:</span> <span class="info-value txt-red" id="ui-taxa-aquec">Aguardando</span></div>
+            <div class="info-row"><span>Tempo p/ Meta:</span> <span class="info-value" id="ui-tempo-meta">Calculando</span></div>
+            <div class="info-row"><span>Eficiência Sist.:</span> <span class="info-value txt-green" id="ui-eficiencia">Analisando</span></div>
+            <div class="info-row"><span>Estratégia:</span> <span class="info-value" id="ui-comportamento">Foco no Conforto</span></div>
+        </div>
+    </div>
+
+    <div class="status-box">
+        <div class="status-left">
+            <div style="text-align: center; margin-bottom: 8px;">sistema</div>
+            <div style="margin-bottom: 4px;">* aquecedor: <span id="st-aquecer" class="txt-off">desligado</span></div>
+            <div>* resfriador: <span id="st-resfriar" class="txt-off">desligado</span></div>
+        </div>
+        <div class="status-right">
+            <div style="font-size: 16px; margin-bottom: 15px; font-weight: bold;">
+                Ação do Agente: <span id="ui-acao" style="color: #f9e2af;">manter_sistema()</span>
+            </div>
+            <div style="display: flex; justify-content: space-around; font-size: 13px;">
+                <div>Espera/Cooldown: <strong id="ui-espera" style="color: #89dceb;">0 passos</strong></div>
+                <div>Tempo Atual: <strong id="ui-passo">987</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-row">
+        <button class="btn-green" onclick="avancarPasso()">Avançar 1 Passo</button>
+        <button id="btn-autoplay" class="btn-purple" onclick="toggleAutoPlay()">▶ Simular Automaticamente</button>
+    </div>
+
+    <div class="history-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tempo</th>
+                    <th>Temp Lida</th>
+                    <th>Ação Executada</th>
+                    <th>Estado Final</th>
+                    <th>Janela</th>
+                </tr>
+            </thead>
+            <tbody id="ui-tabela-historico"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let tempAtual = 35.0;
+    let tempAnterior = 35.0;
+    let passoAtual = 987;
+    let tempoEspera = 0;
+    let k = 1;
+    
+    let statusResfriar = "desligado";
+    let statusAquecer = "desligado";
+    let historicoResfriamento = [];
+    let historicoAquecimento = [];
+    let isAutoPlaying = false;
+    let autoPlayInterval = null;
+
+    function obterAlvoSeguro() {
+        let textoOriginal = document.getElementById('ui-temp-alvo').value;
+        let textoCorrigido = textoOriginal.replace(',', '.');
+        let numero = parseFloat(textoCorrigido);
+        return isNaN(numero) ? 25.0 : numero;
+    }
+
+    function atualizarInterface() {
+        const alvo = obterAlvoSeguro();
+        const salaEmUso = document.getElementById('ui-sala-uso').checked;
+        const delta = salaEmUso ? 0.5 : 2.0; 
+
+        document.getElementById('ui-temp-atual').innerText = tempAtual.toFixed(1) + " °C";
+        document.getElementById('ui-delta').innerText = delta.toFixed(1) + " °C";
+        document.getElementById('ui-limite-sup').innerText = (alvo + delta).toFixed(1) + " °C";
+        document.getElementById('ui-limite-inf').innerText = (alvo - delta).toFixed(1) + " °C";
+        document.getElementById('ui-espera').innerText = tempoEspera + " passos";
+        document.getElementById('ui-passo').innerText = passoAtual;
+        
+        // Atualiza a nova caixa da Esquerda
+        const elResf = document.getElementById('st-resfriar');
+        const elAquec = document.getElementById('st-aquecer');
+        elResf.innerText = statusResfriar;
+        elResf.className = statusResfriar === "ligado" ? "txt-on" : "txt-off";
+        elAquec.innerText = statusAquecer;
+        elAquec.className = statusAquecer === "ligado" ? "txt-on" : "txt-off";
+
+        document.getElementById('ui-comportamento').innerText = salaEmUso ? "Foco no Conforto" : "Economia Energia";
+    }
+
+    function alterarClima(valor) {
+        tempAnterior = tempAtual;
+        tempAtual += valor;
+        atualizarInterface();
+    }
+
+    function aprenderComAmbiente() {
+        let variacao = tempAnterior - tempAtual;
+        
+        if (statusResfriar === "ligado" && variacao > 0) {
+            historicoResfriamento.push(variacao);
+            let mediaResf = historicoResfriamento.reduce((a,b)=>a+b,0) / historicoResfriamento.length;
+            document.getElementById('ui-taxa-resf').innerText = mediaResf.toFixed(2) + " °C/pass";
+            document.getElementById('ui-eficiencia').innerText = "Alta";
+        } 
+        else if (statusAquecer === "ligado" && variacao < 0) {
+            historicoAquecimento.push(Math.abs(variacao));
+            let mediaAquec = historicoAquecimento.reduce((a,b)=>a+b,0) / historicoAquecimento.length;
+            document.getElementById('ui-taxa-aquec').innerText = mediaAquec.toFixed(2) + " °C/pass";
+        }
+
+        const alvo = obterAlvoSeguro();
+        if (tempAtual > alvo + 0.5 && historicoResfriamento.length > 0) {
+            let mediaResf = historicoResfriamento.reduce((a,b)=>a+b,0) / historicoResfriamento.length;
+            let passosEstimados = Math.ceil((tempAtual - alvo) / mediaResf);
+            document.getElementById('ui-tempo-meta').innerText = passosEstimados + " passos";
+        } else if (tempAtual < alvo - 0.5 && historicoAquecimento.length > 0) {
+            let mediaAquec = historicoAquecimento.reduce((a,b)=>a+b,0) / historicoAquecimento.length;
+            let passosEstimados = Math.ceil((alvo - tempAtual) / mediaAquec);
+            document.getElementById('ui-tempo-meta').innerText = passosEstimados + " passos";
+        } else if (tempAtual <= alvo + 0.5 && tempAtual >= alvo - 0.5) {
+            document.getElementById('ui-tempo-meta').innerText = "Atingida";
+        }
+    }
+
+    function registrarHistorico(acao, tempLida, salaEmUso, estadoFinal) {
+        const tbody = document.getElementById('ui-tabela-historico');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${passoAtual}</td>
+            <td>${tempLida}</td>
+            <td>${acao}</td>
+            <td>${estadoFinal}</td>
+            <td>${salaEmUso ? 'Ocupada' : 'Vazia'}</td>
+        `;
+        tbody.prepend(tr); // Adiciona no topo
+    }
+
+    function avancarPasso() {
+        passoAtual++;
+        tempAnterior = tempAtual;
+        let acaoEscolhida = "manter_sistema()";
+        let tempLida = "-";
+        const salaEmUso = document.getElementById('ui-sala-uso').checked;
+        let estadoFinal = "Desligado";
+
+        if (tempoEspera > 0) {
+            tempoEspera--;
+            acaoEscolhida = "manter_sistema() (Espera)";
+            tempLida = "Ignorado";
+            estadoFinal = statusResfriar === "ligado" ? "Resfriando" : (statusAquecer === "ligado" ? "Aquecendo" : "Desligado");
+        } else {
+            tempLida = tempAtual.toFixed(1) + " °C";
+            const alvo = obterAlvoSeguro();
+            const delta = salaEmUso ? 0.5 : 2.0;
+            
+            // LÓGICA DE INTERTRAVAMENTO E ESPERA INTELIGENTE
+            if (tempAtual >= alvo + delta) {
+                statusResfriar = "ligado";
+                statusAquecer = "desligado";
+                acaoEscolhida = "resfriar()";
+                estadoFinal = "Ligado";
+                
+                // Regra 8 da Vívian: Usa a taxa se aprendeu, senão usa k
+                let taxa = historicoResfriamento.length > 0 ? (historicoResfriamento.reduce((a,b)=>a+b,0) / historicoResfriamento.length) : k;
+                tempoEspera = Math.max(1, Math.floor((tempAtual - alvo) / taxa)); 
+                
+                tempAtual -= 0.20; // Tópico 10 da Vívian: Incremento de 0.20
+                
+            } else if (tempAtual <= alvo - delta) {
+                statusResfriar = "desligado";
+                statusAquecer = "ligado";
+                acaoEscolhida = "aquecer()";
+                estadoFinal = "Ligado";
+                
+                // Regra 8 para aquecimento
+                let taxa = historicoAquecimento.length > 0 ? (historicoAquecimento.reduce((a,b)=>a+b,0) / historicoAquecimento.length) : k;
+                tempoEspera = Math.max(1, Math.floor((alvo - tempAtual) / taxa));
+                
+                tempAtual += 0.20; // Tópico 10 da Vívian: Incremento de 0.20
+                
+            }
+        }
+
+        aprenderComAmbiente();
+        document.getElementById('ui-acao').innerText = acaoEscolhida;
+        registrarHistorico(acaoEscolhida, tempLida, salaEmUso, estadoFinal);
+        atualizarInterface();
+    }
+
+    function toggleAutoPlay() {
+        const btn = document.getElementById('btn-autoplay');
+        if (isAutoPlaying) {
+            clearInterval(autoPlayInterval);
+            isAutoPlaying = false;
+            btn.innerText = "▶ Simular Automaticamente";
+            btn.style.backgroundColor = "#cba6f7"; 
+        } else {
+            isAutoPlaying = true;
+            btn.innerText = "⏸ Pausar Simulação";
+            btn.style.backgroundColor = "#f5a9b8"; 
+            autoPlayInterval = setInterval(avancarPasso, 1000); 
+        }
+    }
+
+    atualizarInterface();
+</script>
+</body>
+</html>
