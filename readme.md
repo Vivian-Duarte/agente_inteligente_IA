@@ -246,7 +246,6 @@ O agente é considerado racional porque:
 
 Liga quando:
 
-
 temperatura_atual >= temperatura_desejada + Δ
 
 Desliga quando:
